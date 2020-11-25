@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
@@ -132,25 +133,91 @@ Task cancelTask = Task.Run(() =>
 });
 
 //範例4.5 Cancel async tasks after a period of time
-s_cts.CancelAfter(3500);
+//s_cts.CancelAfter(3500);
 
-Task sumPageSizesTask = SumPageSizesAsync();
+//Task sumPageSizesTask = SumPageSizesAsync();
 
-await Task.WhenAny(new[] { cancelTask, sumPageSizesTask });
+//await Task.WhenAny(new[] { cancelTask, sumPageSizesTask });
 
-Console.WriteLine("Application ending.");
+//Console.WriteLine("Application ending.");
 
 
-async Task SumPageSizesAsync()
+//async Task SumPageSizesAsync()
+//{
+//    var stopwatch = Stopwatch.StartNew();
+
+//    int total = 0;
+//    foreach (string url in s_urlList)
+//    {
+//        // 當Enter被按下  Token 換變成 True 
+//        int contentLength = await ProcessUrlAsync(url, s_client, s_cts.Token);
+//        total += contentLength;
+//    }
+
+//    stopwatch.Stop();
+
+//    Console.WriteLine($"\nTotal bytes returned:  {total:#,#}");
+//    Console.WriteLine($"Elapsed time:          {stopwatch.Elapsed}\n");
+//}
+
+//static async Task<int> ProcessUrlAsync(string url, HttpClient client, CancellationToken token)
+//{
+//    HttpResponseMessage response = await client.GetAsync(url, token);
+//    byte[] content = await response.Content.ReadAsByteArrayAsync();
+//    Console.WriteLine($"{url,-60} {content.Length,10:#,#}");
+
+//    return content.Length;
+//}
+
+// 範例5 完成處理
+ HttpClient s_client2 = new HttpClient
+{
+    MaxResponseContentBufferSize = 1_000_000
+};
+
+ IEnumerable<string> s_urlList2 = new string[]
+{
+            "https://docs.microsoft.com",
+            "https://docs.microsoft.com/aspnet/core",
+            "https://docs.microsoft.com/azure",
+            "https://docs.microsoft.com/azure/devops",
+            "https://docs.microsoft.com/dotnet",
+            "https://docs.microsoft.com/dynamics365",
+            "https://docs.microsoft.com/education",
+            "https://docs.microsoft.com/enterprise-mobility-security",
+            "https://docs.microsoft.com/gaming",
+            "https://docs.microsoft.com/graph",
+            "https://docs.microsoft.com/microsoft-365",
+            "https://docs.microsoft.com/office",
+            "https://docs.microsoft.com/powershell",
+            "https://docs.microsoft.com/sql",
+            "https://docs.microsoft.com/surface",
+            "https://docs.microsoft.com/system-center",
+            "https://docs.microsoft.com/visualstudio",
+            "https://docs.microsoft.com/windows",
+            "https://docs.microsoft.com/xamarin"
+};
+
+await SumPageSizesAsync2();
+
+ async Task SumPageSizesAsync2()
 {
     var stopwatch = Stopwatch.StartNew();
 
+    IEnumerable<Task<int>> downloadTasksQuery =
+        from url in s_urlList2
+        select ProcessUrlAsync2(url, s_client2);
+
+    List<Task<int>> downloadTasks = downloadTasksQuery.ToList();
+
     int total = 0;
-    foreach (string url in s_urlList)
+    while (downloadTasks.Any())
     {
-        // 當Enter被按下  Token 換變成 True 
-        int contentLength = await ProcessUrlAsync(url, s_client, s_cts.Token);
-        total += contentLength;
+        Task<int> finishedTask = await Task.WhenAny(downloadTasks);
+        downloadTasks.Remove(finishedTask);
+        int finishNumber = await finishedTask;
+        Console.WriteLine("complete: " + finishNumber.ToString());
+        total += await finishedTask;
     }
 
     stopwatch.Stop();
@@ -159,10 +226,9 @@ async Task SumPageSizesAsync()
     Console.WriteLine($"Elapsed time:          {stopwatch.Elapsed}\n");
 }
 
-static async Task<int> ProcessUrlAsync(string url, HttpClient client, CancellationToken token)
+ async Task<int> ProcessUrlAsync2(string url, HttpClient client)
 {
-    HttpResponseMessage response = await client.GetAsync(url, token);
-    byte[] content = await response.Content.ReadAsByteArrayAsync();
+    byte[] content = await client.GetByteArrayAsync(url);
     Console.WriteLine($"{url,-60} {content.Length,10:#,#}");
 
     return content.Length;

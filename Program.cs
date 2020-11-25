@@ -1,5 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 
 //運行需求 .net5  使用最上層陳述式 toplevel 
@@ -11,7 +15,7 @@ Console.WriteLine("Start...");
  * caller 也要加上 await 才會等待 call method 的 await
  * 不然會在 getStringTask 時 Yield caller 然後就結束了
  */
-await GetUrlContentLengthAsync();
+//await GetUrlContentLengthAsync();
 async Task<int> GetUrlContentLengthAsync()
 {
     var client = new HttpClient();
@@ -53,3 +57,109 @@ async Task GetTaskAsync()
 }
 
 await GetTaskAsync();
+
+//範例三  有傳回值的骰子
+
+Random s_rnd = new Random();
+
+Console.WriteLine($"You rolled {await GetDiceRollAsync()}");
+
+async ValueTask<int> GetDiceRollAsync()
+{
+    Console.WriteLine("Shaking dice...");
+
+    int roll1 = await RollAsync();
+    int roll2 = await RollAsync();
+
+    return roll1 + roll2;
+}
+
+async ValueTask<int> RollAsync()
+{
+    await Task.Delay(500);
+
+    int diceRoll = s_rnd.Next(1, 7);
+    return diceRoll;
+}
+
+//範例四 Cancel a list of tasks
+CancellationTokenSource s_cts = new CancellationTokenSource();
+
+HttpClient s_client = new HttpClient
+{
+    MaxResponseContentBufferSize = 1_000_000
+};
+
+IEnumerable<string> s_urlList = new string[]
+{
+            "https://docs.microsoft.com",
+            "https://docs.microsoft.com/aspnet/core",
+            "https://docs.microsoft.com/azure",
+            "https://docs.microsoft.com/azure/devops",
+            "https://docs.microsoft.com/dotnet",
+            "https://docs.microsoft.com/dynamics365",
+            "https://docs.microsoft.com/education",
+            "https://docs.microsoft.com/enterprise-mobility-security",
+            "https://docs.microsoft.com/gaming",
+            "https://docs.microsoft.com/graph",
+            "https://docs.microsoft.com/microsoft-365",
+            "https://docs.microsoft.com/office",
+            "https://docs.microsoft.com/powershell",
+            "https://docs.microsoft.com/sql",
+            "https://docs.microsoft.com/surface",
+            "https://docs.microsoft.com/system-center",
+            "https://docs.microsoft.com/visualstudio",
+            "https://docs.microsoft.com/windows",
+            "https://docs.microsoft.com/xamarin"
+};
+
+
+Console.WriteLine("Application started.");
+Console.WriteLine("Press the ENTER key to cancel...\n");
+
+Task cancelTask = Task.Run(() =>
+{
+    while (Console.ReadKey().Key != ConsoleKey.Enter)
+    {
+        Console.WriteLine("Press the ENTER key to cancel...");
+    }
+
+    Console.WriteLine("\nENTER key pressed: cancelling downloads.\n");
+    s_cts.Cancel();
+});
+
+//範例4.5 Cancel async tasks after a period of time
+s_cts.CancelAfter(3500);
+
+Task sumPageSizesTask = SumPageSizesAsync();
+
+await Task.WhenAny(new[] { cancelTask, sumPageSizesTask });
+
+Console.WriteLine("Application ending.");
+
+
+async Task SumPageSizesAsync()
+{
+    var stopwatch = Stopwatch.StartNew();
+
+    int total = 0;
+    foreach (string url in s_urlList)
+    {
+        int contentLength = await ProcessUrlAsync(url, s_client, s_cts.Token);
+        total += contentLength;
+    }
+
+    stopwatch.Stop();
+
+    Console.WriteLine($"\nTotal bytes returned:  {total:#,#}");
+    Console.WriteLine($"Elapsed time:          {stopwatch.Elapsed}\n");
+}
+
+static async Task<int> ProcessUrlAsync(string url, HttpClient client, CancellationToken token)
+{
+    HttpResponseMessage response = await client.GetAsync(url, token);
+    byte[] content = await response.Content.ReadAsByteArrayAsync();
+    Console.WriteLine($"{url,-60} {content.Length,10:#,#}");
+
+    return content.Length;
+}

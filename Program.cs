@@ -83,6 +83,9 @@ async ValueTask<int> RollAsync()
 }
 
 //範例四 Cancel a list of tasks
+
+
+// 用來記錄 Enter 事件的token
 CancellationTokenSource s_cts = new CancellationTokenSource();
 
 HttpClient s_client = new HttpClient
@@ -145,6 +148,7 @@ async Task SumPageSizesAsync()
     int total = 0;
     foreach (string url in s_urlList)
     {
+        // 當Enter被按下  Token 換變成 True 
         int contentLength = await ProcessUrlAsync(url, s_client, s_cts.Token);
         total += contentLength;
     }

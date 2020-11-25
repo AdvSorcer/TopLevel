@@ -2,22 +2,21 @@
 using System.Net.Http;
 using System.Threading.Tasks;
 
-//運行需求 .net5 toplevel 
+//運行需求 .net5  使用最上層陳述式 toplevel 
+
+Console.WriteLine("Start...");
+//範例一 : 了解非同步運作方式
 
 /*
  * caller 也要加上 await 才會等待 call method 的 await
  * 不然會在 getStringTask 時 Yield caller 然後就結束了
  */
-
 await GetUrlContentLengthAsync();
-
-Console.WriteLine("end");
-
 async Task<int> GetUrlContentLengthAsync()
 {
     var client = new HttpClient();
 
-    //按照慣例，非同步方法的名稱是以 "Async" 後置字元為結尾。
+    //按照慣例，非同步方法的名稱是以 "Async" 後置字元為結尾。 但別複寫原有內建事件名稱
     Task<string> getStringTask =
         client.GetStringAsync("https://docs.microsoft.com/dotnet");
 
@@ -33,3 +32,24 @@ async Task<int> GetUrlContentLengthAsync()
     return 2;
 }
 
+
+//範例二  有傳回的Task 跟沒有傳回的Task
+
+async Task<int> GetTaskOfTResultAsync()
+{
+    int hours = 0;
+    await Task.Delay(0);
+    Console.WriteLine("Result Here");
+    return hours;
+}
+
+await GetTaskOfTResultAsync();
+
+async Task GetTaskAsync()
+{
+    await Task.Delay(0);
+    Console.WriteLine("No Result Here");
+    // No return statement needed
+}
+
+await GetTaskAsync();
